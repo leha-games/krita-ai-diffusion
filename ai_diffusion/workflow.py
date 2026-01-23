@@ -1422,17 +1422,9 @@ def expand_custom(
                 outputs[node.output(8)] = sampling.cfg_scale
             
             case "ETN_KritaStyleAndPrompt":
-                style = ensure(input.style)
-                is_live = node.input("sampler_preset", "auto") == "live"
-                
-                checkpoint_input = style.get_models(models.checkpoints)
-                checkpoint_input.loras = unique(
-                    checkpoint_input.loras + input.loras, key=lambda l: l.name
-                )
-                
-                sampling = _sampling_from_style(style, 1.0, is_live)
-                model, clip, vae = load_checkpoint_with_lora(w, checkpoint_input, models)
-                
+                checkpoint_input = ensure(input.models)
+                sampling = ensure(input.sampling)
+                model, clip, vae = load_checkpoint_with_lora(w, checkpoint_input, models)            
                 outputs[node.output(0)] = model
                 outputs[node.output(1)] = clip.model
                 outputs[node.output(2)] = vae

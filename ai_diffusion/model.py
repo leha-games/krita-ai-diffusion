@@ -19,14 +19,14 @@ from .api import ConditioningInput, ControlInput, WorkflowKind, WorkflowInput, S
 from .api import FillMode, ImageInput, CustomWorkflowInput, UpscaleInput
 from .api import InpaintMode, InpaintContext, InpaintParams
 from .localization import translate as _
-from .util import clamp, ensure, trim_text, client_logger as log
+from .util import clamp, ensure, unique, trim_text, client_logger as log
 from .settings import ApplyBehavior, ApplyRegionBehavior, GenerationFinishedAction, ImageFileFormat
 from .settings import settings
 from .network import NetworkError
 from .image import Extent, Image, Mask, Bounds, DummyImage
 from .client import Client, ClientMessage, ClientEvent, ClientOutput
 from .client import is_style_supported, filter_supported_styles, resolve_arch
-from .custom_workflow import CustomWorkspace, WorkflowCollection, CustomGenerationMode
+from .custom_workflow import CustomWorkspace, WorkflowCollection, CustomGenerationMode, ComfyWorkflow
 from .document import Document, KritaDocument, SelectionModifiers
 from .layer import Layer, LayerType, RestoreActiveLayer
 from .pose import Pose
@@ -497,10 +497,10 @@ class Model(QObject, ObservableProperties):
             params = self.custom.collect_parameters(self.layers, canvas_bounds, is_anim)
             
             has_synced_style_and_prompt = next(wf.find(type="ETN_KritaStyleAndPrompt"), None) is not None
-            custom_input = CustomWorkflowInput(wf.root, params, style=self.style if has_synced_style_and_prompt else None)
+            custom_input = CustomWorkflowInput(wf.root, params)
             prompt_meta = {}
             if has_synced_style_and_prompt:
-                custom_input, prompt_meta = self._prepare_synced_style_and_prompt(params, seed, custom_input)
+                custom_input, prompt_meta = self._prepare_synced_style_and_prompt(params, seed, custom_input, wf)
             
             input = WorkflowInput(
                 WorkflowKind.custom,
@@ -532,12 +532,18 @@ class Model(QObject, ObservableProperties):
             return False
         
     def _prepare_synced_style_and_prompt(
-        self, params: dict[str, Any], seed: int, custom_input: CustomWorkflowInput
+        self, params: dict[str, Any], seed: int, custom_input: CustomWorkflowInput, wf: ComfyWorkflow
     ) -> tuple[CustomWorkflowInput, dict[str, Any]]:
-        """Prepare prompts for ETN_KritaStyleAndPrompt node.
-        Returns updated CustomWorkflowInput with evaluated prompts and metadata for job history.
+        """Prepare prompts and models for ETN_KritaStyleAndPrompt node.
+        Returns updated CustomWorkflowInput with evaluated prompts, models, sampling, and metadata for job history.
         """
         style = self.style
+        
+        style_node = next(wf.find(type="ETN_KritaStyleAndPrompt"), None)
+        is_live = style_node.input("sampler_preset", "auto") == "live" if style_node else False
+        
+        checkpoint_input = style.get_models(self._connection.client.models.checkpoints)
+        sampling = workflow._sampling_from_style(style, 1.0, is_live)
         
         positive = self.regions.positive
         negative = self.regions.negative
@@ -546,11 +552,15 @@ class Model(QObject, ObservableProperties):
         arch = resolve_arch(style, self._connection.client_if_connected)
         prepared = workflow.prepare_prompts(cond, style, seed, arch, FileLibrary.instance())
         
+        merged_loras = unique(checkpoint_input.loras + prepared.loras, key=lambda l: l.name)
+        checkpoint_input.loras = merged_loras
+        
         custom_input = replace(
             custom_input,
             positive_evaluated=prepared.metadata["prompt_final"],
             negative_evaluated=prepared.metadata["negative_prompt_final"],
-            loras=prepared.loras,
+            models=checkpoint_input,
+            sampling=sampling,
         )
         
         meta = dict(prepared.metadata)
