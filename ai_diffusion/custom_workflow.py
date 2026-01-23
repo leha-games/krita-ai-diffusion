@@ -251,8 +251,7 @@ class ParamKind(Enum):
     prompt_negative = 7
     choice = 8
     style = 9
-    synced_prompt_positive = 10
-    synced_prompt_negative = 11
+    synced_prompt = 10
 
 
 class CustomParam(NamedTuple):
@@ -309,17 +308,7 @@ def workflow_parameters(w: ComfyWorkflow):
                 yield CustomParam(ParamKind.style, name, node.input("sampler_preset", "auto"))
             case ("ETN_KritaPromptStyle", _):
                 name = node.input("name", "Style")
-                yield CustomParam(ParamKind.style, name, node.input("sampler_preset", "auto"))
-                yield CustomParam(
-                    ParamKind.synced_prompt_positive,
-                    f"{name}/positive_prompt",
-                    default=node.input("positive_prompt", "")
-                )
-                yield CustomParam(
-                    ParamKind.synced_prompt_negative,
-                    f"{name}/negative_prompt",
-                    default=node.input("negative_prompt", "")
-                )
+                yield CustomParam(ParamKind.synced_prompt, name)
             case ("ETN_KritaImageLayer", _):
                 name = node.input("name", "Image")
                 yield CustomParam(ParamKind.image_layer, name)
@@ -445,10 +434,7 @@ class CustomWorkspace(QObject, ObservableProperties):
     def _validate_workflow(self, wf: ComfyWorkflow):
         prompt_style_count = sum(1 for _ in wf.find(type="ETN_KritaPromptStyle"))
         if prompt_style_count > 1:
-            self.validation_error = _(
-                "Workflow contains multiple Krita Prompt Style nodes. "
-                "Only one is allowed since prompts sync across workspaces."
-            )
+            self.validation_error = _("Workflow contains multiple Krita Prompt Style nodes. Only one is allowed since prompts sync across workspaces.")
         else:
             self.validation_error = ""
 
@@ -525,7 +511,7 @@ class CustomWorkspace(QObject, ObservableProperties):
                 return str(self.params[param.name])
         return self.workflow_id or "Custom Workflow"
 
-    def collect_parameters(self, layers: "LayerManager", bounds: Bounds, animation=False, model=None):
+    def collect_parameters(self, layers: "LayerManager", bounds: Bounds, animation=False):
         params = copy(self.params)
         for md in self.metadata:
             param = params.get(md.name)
@@ -555,12 +541,8 @@ class CustomWorkspace(QObject, ObservableProperties):
                 if style is None:
                     raise ValueError(f"Style {param} not found")
                 params[md.name] = style
-            elif md.kind is ParamKind.synced_prompt_positive:
-                if model is not None:
-                    params[md.name] = model.regions.positive
-            elif md.kind is ParamKind.synced_prompt_negative:
-                if model is not None:
-                    params[md.name] = model.regions.negative
+            elif md.kind is ParamKind.synced_prompt:
+                pass  # handled in model.py via CustomWorkflowInput
             elif param is None:
                 raise ValueError(f"Parameter {md.name} not found")
 

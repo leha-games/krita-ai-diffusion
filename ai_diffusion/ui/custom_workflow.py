@@ -476,7 +476,7 @@ class WorkflowParamsWidget(QWidget):
         current_group: tuple[str, GroupHeader | None, list[CustomParamWidget]] = ("", None, [])
 
         for p in params:
-            if p.kind in (ParamKind.synced_prompt_positive, ParamKind.synced_prompt_negative):
+            if p.kind is ParamKind.synced_prompt:
                 continue
             group, expander, group_widgets = current_group
             if p.group != group:
@@ -703,6 +703,9 @@ class CustomWorkflowWidget(QWidget):
         self._params_scroll.setFrameShape(QFrame.Shape.NoFrame)
         self._params_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         
+        self._style_widget = StyleSelectWidget(self)
+        self._style_widget.setVisible(False)  # Hidden until workflow has synced style
+        
         self._prompt_widget = ActiveRegionWidget(
             self._model.regions, self, header=PromptHeader.none
         )
@@ -781,6 +784,7 @@ class CustomWorkflowWidget(QWidget):
         header_layout.addWidget(self._workflow_select_widgets)
         header_layout.addWidget(self._workflow_edit_widgets)
         layout.addLayout(header_layout)
+        layout.addWidget(self._style_widget)
         layout.addWidget(self._prompt_widget)
         layout.addWidget(self._splitter)
         actions_layout = QHBoxLayout()
@@ -819,6 +823,7 @@ class CustomWorkflowWidget(QWidget):
             self._model = model
             self._model_bindings = [
                 bind(model, "workspace", self._workspace_select, "value", Bind.one_way),
+                bind(model, "style", self._style_widget, "value"),
                 bind(model, "error", self._error_box, "error", Bind.one_way),
                 bind_combo(model.custom, "workflow_id", self._workflow_select, Bind.one_way),
                 bind(model.custom, "outputs", self._outputs, "value", Bind.one_way),
@@ -886,6 +891,7 @@ class CustomWorkflowWidget(QWidget):
         if not self.model.custom.workflow:
             self._save_workflow_button.setEnabled(False)
             self._delete_workflow_button.setEnabled(False)
+            self._style_widget.setVisible(False)
             self._prompt_widget.setVisible(False)
             return
         self._save_workflow_button.setEnabled(True)
@@ -893,11 +899,12 @@ class CustomWorkflowWidget(QWidget):
             self.model.custom.workflow.source is WorkflowSource.local
         )
 
-        has_synced_prompts = any(
-            p.kind in (ParamKind.synced_prompt_positive, ParamKind.synced_prompt_negative)
+        has_synced_prompt = any(
+            p.kind is ParamKind.synced_prompt
             for p in self.model.custom.metadata
         )
-        self._prompt_widget.setVisible(has_synced_prompts)
+        self._style_widget.setVisible(has_synced_prompt)
+        self._prompt_widget.setVisible(has_synced_prompt)
 
         if self._params_widget:
             self._params_scroll.setWidget(None)

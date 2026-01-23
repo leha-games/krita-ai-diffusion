@@ -494,19 +494,22 @@ class Model(QObject, ObservableProperties):
             img_input.initial_image = self._get_current_image(bounds)
             img_input.hires_mask = mask.to_image(bounds.extent) if mask else None
 
-            params = self.custom.collect_parameters(self.layers, canvas_bounds, is_anim, model=self)
+            params = self.custom.collect_parameters(self.layers, canvas_bounds, is_anim)
+            
+            has_prompt_style = next(wf.find(type="ETN_KritaPromptStyle"), None) is not None
+            custom_input = CustomWorkflowInput(wf.root, params, style=self.style if has_prompt_style else None)
+            prompt_meta = {}
+            if has_prompt_style:
+                custom_input, prompt_meta = self._prepare_prompt_style(params, seed, custom_input)
             
             input = WorkflowInput(
                 WorkflowKind.custom,
                 img_input,
                 sampling=SamplingInput("custom", "custom", 1, 1000, seed=seed),
                 inpaint=InpaintParams(InpaintMode.fill, bounds),
-                custom_workflow=CustomWorkflowInput(wf.root, params),
+                custom_workflow=custom_input,
             )
             
-            prompt_meta = {}
-            if prompt_style_node := next(wf.find(type="ETN_KritaPromptStyle"), None):
-                prompt_meta = self._prepare_prompt_style(prompt_style_node, params, seed) 
             metadata: dict[str, Any] = dict(self.custom.params)
             metadata.update(prompt_meta)
             
@@ -528,33 +531,31 @@ class Model(QObject, ObservableProperties):
             self.report_error(util.log_error(e))
             return False
         
-    def _prepare_prompt_style(self, node, params: dict[str, Any], seed: int) -> dict[str, Any]:
-        """ Prepare prompts for ETN_KritaPromptStyle node.
-        Results passed to workflow.py through params.
-        Returns metadata for job history (Copy Prompt, Copy Style, etc.).
+    def _prepare_prompt_style(
+        self, params: dict[str, Any], seed: int, custom_input: CustomWorkflowInput
+    ) -> tuple[CustomWorkflowInput, dict[str, Any]]:
+        """Prepare prompts for ETN_KritaPromptStyle node.
+        Returns updated CustomWorkflowInput with evaluated prompts and metadata for job history.
         """
-        style_name = node.input("name", "Style")
-        style: Style | None = params.get(style_name)
+        style = self.style
         
-        if style is None:
-            return {}
-        
-        positive = params.get(f"{style_name}/positive_prompt", "")
-        negative = params.get(f"{style_name}/negative_prompt", "")
+        positive = self.regions.positive
+        negative = self.regions.negative
         
         cond = ConditioningInput(positive, negative)
         arch = resolve_arch(style, self._connection.client_if_connected)
         prepared = workflow.prepare_prompts(cond, style, seed, arch, FileLibrary.instance())
         
-        params[f"{style_name}/_prepared"] = {
-            "positive_final": prepared.metadata["prompt_final"],
-            "negative_final": prepared.metadata["negative_prompt_final"],
-            "loras": prepared.loras,
-        }
+        custom_input = replace(
+            custom_input,
+            positive_evaluated=prepared.metadata["prompt_final"],
+            negative_evaluated=prepared.metadata["negative_prompt_final"],
+            loras=prepared.loras,
+        )
         
         meta = dict(prepared.metadata)
         meta["style"] = style.filename
-        return meta
+        return custom_input, meta
 
     def _get_current_image(self, bounds: Bounds):
         exclude = []

@@ -1,14 +1,18 @@
+from __future__ import annotations
 from dataclasses import Field, dataclass, field, is_dataclass, fields, MISSING
 from copy import copy
 from enum import Enum
 from types import GenericAlias, UnionType
-from typing import Any, get_args, get_origin
+from typing import Any, TYPE_CHECKING, get_args, get_origin
 import math
 
 from .image import Bounds, Extent, Image, ImageCollection
 from .resources import ControlMode, Arch
 from .settings import ImageFileFormat
 from .util import ensure, clamp
+
+if TYPE_CHECKING:
+    from .style import Style
 
 
 class WorkflowKind(Enum):
@@ -169,6 +173,10 @@ class UpscaleInput:
 class CustomWorkflowInput:
     workflow: dict
     params: dict[str, Any]
+    positive_evaluated: str = ""
+    negative_evaluated: str = ""
+    loras: list[LoraInput] = field(default_factory=list)
+    style: Style | None = None
 
 
 @dataclass
