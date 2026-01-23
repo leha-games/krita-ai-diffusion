@@ -1421,7 +1421,7 @@ def expand_custom(
                 outputs[node.output(7)] = sampling.total_steps
                 outputs[node.output(8)] = sampling.cfg_scale
             
-            case "ETN_KritaPromptStyle":
+            case "ETN_KritaStyleAndPrompt":
                 style = ensure(input.style)
                 is_live = node.input("sampler_preset", "auto") == "live"
                 

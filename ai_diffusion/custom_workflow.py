@@ -251,7 +251,6 @@ class ParamKind(Enum):
     prompt_negative = 7
     choice = 8
     style = 9
-    synced_prompt = 10
 
 
 class CustomParam(NamedTuple):
@@ -306,9 +305,6 @@ def workflow_parameters(w: ComfyWorkflow):
             case ("ETN_KritaStyle", _):
                 name = node.input("name", "Style")
                 yield CustomParam(ParamKind.style, name, node.input("sampler_preset", "auto"))
-            case ("ETN_KritaPromptStyle", _):
-                name = node.input("name", "Style")
-                yield CustomParam(ParamKind.synced_prompt, name)
             case ("ETN_KritaImageLayer", _):
                 name = node.input("name", "Image")
                 yield CustomParam(ParamKind.image_layer, name)
@@ -432,9 +428,9 @@ class CustomWorkspace(QObject, ObservableProperties):
             self.graph_changed.emit()
 
     def _validate_workflow(self, wf: ComfyWorkflow):
-        prompt_style_count = sum(1 for _ in wf.find(type="ETN_KritaPromptStyle"))
-        if prompt_style_count > 1:
-            self.validation_error = _("Workflow contains multiple Krita Prompt Style nodes. Only one is allowed since prompts sync across workspaces.")
+        style_and_prompt_node_count = sum(1 for _ in wf.find(type="ETN_KritaStyleAndPrompt"))
+        if style_and_prompt_node_count > 1:
+            self.validation_error = _("Workflow contains multiple `Krita Style & Prompt` nodes. Only one is allowed since prompts sync across workspaces.")
         else:
             self.validation_error = ""
 
@@ -541,8 +537,6 @@ class CustomWorkspace(QObject, ObservableProperties):
                 if style is None:
                     raise ValueError(f"Style {param} not found")
                 params[md.name] = style
-            elif md.kind is ParamKind.synced_prompt:
-                pass  # handled in model.py via CustomWorkflowInput
             elif param is None:
                 raise ValueError(f"Parameter {md.name} not found")
 

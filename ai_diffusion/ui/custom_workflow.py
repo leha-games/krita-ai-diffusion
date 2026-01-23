@@ -476,8 +476,6 @@ class WorkflowParamsWidget(QWidget):
         current_group: tuple[str, GroupHeader | None, list[CustomParamWidget]] = ("", None, [])
 
         for p in params:
-            if p.kind is ParamKind.synced_prompt:
-                continue
             group, expander, group_widgets = current_group
             if p.group != group:
                 self._create_group(expander, group_widgets)
@@ -899,12 +897,10 @@ class CustomWorkflowWidget(QWidget):
             self.model.custom.workflow.source is WorkflowSource.local
         )
 
-        has_synced_prompt = any(
-            p.kind is ParamKind.synced_prompt
-            for p in self.model.custom.metadata
-        )
-        self._style_widget.setVisible(has_synced_prompt)
-        self._prompt_widget.setVisible(has_synced_prompt)
+        graph = self.model.custom.graph
+        has_synced_style_and_prompt = graph is not None and next(graph.find(type="ETN_KritaStyleAndPrompt"), None) is not None
+        self._style_widget.setVisible(has_synced_style_and_prompt)
+        self._prompt_widget.setVisible(has_synced_style_and_prompt)
 
         if self._params_widget:
             self._params_scroll.setWidget(None)

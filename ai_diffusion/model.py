@@ -496,11 +496,11 @@ class Model(QObject, ObservableProperties):
 
             params = self.custom.collect_parameters(self.layers, canvas_bounds, is_anim)
             
-            has_prompt_style = next(wf.find(type="ETN_KritaPromptStyle"), None) is not None
-            custom_input = CustomWorkflowInput(wf.root, params, style=self.style if has_prompt_style else None)
+            has_synced_style_and_prompt = next(wf.find(type="ETN_KritaStyleAndPrompt"), None) is not None
+            custom_input = CustomWorkflowInput(wf.root, params, style=self.style if has_synced_style_and_prompt else None)
             prompt_meta = {}
-            if has_prompt_style:
-                custom_input, prompt_meta = self._prepare_prompt_style(params, seed, custom_input)
+            if has_synced_style_and_prompt:
+                custom_input, prompt_meta = self._prepare_synced_style_and_prompt(params, seed, custom_input)
             
             input = WorkflowInput(
                 WorkflowKind.custom,
@@ -531,10 +531,10 @@ class Model(QObject, ObservableProperties):
             self.report_error(util.log_error(e))
             return False
         
-    def _prepare_prompt_style(
+    def _prepare_synced_style_and_prompt(
         self, params: dict[str, Any], seed: int, custom_input: CustomWorkflowInput
     ) -> tuple[CustomWorkflowInput, dict[str, Any]]:
-        """Prepare prompts for ETN_KritaPromptStyle node.
+        """Prepare prompts for ETN_KritaStyleAndPrompt node.
         Returns updated CustomWorkflowInput with evaluated prompts and metadata for job history.
         """
         style = self.style
