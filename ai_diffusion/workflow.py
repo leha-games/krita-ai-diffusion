@@ -1420,11 +1420,11 @@ def expand_custom(
                 outputs[node.output(6)] = sampling.scheduler
                 outputs[node.output(7)] = sampling.total_steps
                 outputs[node.output(8)] = sampling.cfg_scale
-            
+
             case "ETN_KritaStyleAndPrompt":
                 checkpoint_input = ensure(input.models)
                 sampling = ensure(input.sampling)
-                model, clip, vae = load_checkpoint_with_lora(w, checkpoint_input, models)            
+                model, clip, vae = load_checkpoint_with_lora(w, checkpoint_input, models)
                 outputs[node.output(0)] = model
                 outputs[node.output(1)] = clip.model
                 outputs[node.output(2)] = vae

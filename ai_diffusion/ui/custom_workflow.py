@@ -700,10 +700,10 @@ class CustomWorkflowWidget(QWidget):
         self._params_scroll.setWidgetResizable(True)
         self._params_scroll.setFrameShape(QFrame.Shape.NoFrame)
         self._params_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        
+
         self._style_widget = StyleSelectWidget(self)
         self._style_widget.setVisible(False)  # Hidden until workflow has synced style
-        
+
         self._prompt_widget = ActiveRegionWidget(
             self._model.regions, self, header=PromptHeader.none
         )
@@ -898,7 +898,9 @@ class CustomWorkflowWidget(QWidget):
         )
 
         graph = self.model.custom.graph
-        has_synced_style_and_prompt = graph is not None and next(graph.find(type="ETN_KritaStyleAndPrompt"), None) is not None
+        has_synced_style_and_prompt = (
+            graph is not None and next(graph.find(type="ETN_KritaStyleAndPrompt"), None) is not None
+        )
         self._style_widget.setVisible(has_synced_style_and_prompt)
         self._prompt_widget.setVisible(has_synced_style_and_prompt)
 
